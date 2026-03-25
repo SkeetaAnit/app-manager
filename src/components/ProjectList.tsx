@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Search, Plus, ArrowDownUp, Monitor, MonitorOff } from 'lucide-react';
+import { Settings, Search, Plus, ArrowDownUp, Monitor, MonitorOff, ChevronDown, Folder, LayoutTemplate } from 'lucide-react';
 import { useStore, Project } from '../store';
 import { SettingsModal } from './SettingsModal';
 import { HighlightText } from './HighlightText';
+import { FolderImportModal } from './FolderImportModal';
+import { TemplateSelectModal } from './TemplateSelectModal';
 
 const getRelativeTime = (timestamp: number) => {
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -29,15 +31,33 @@ const getRelativeTime = (timestamp: number) => {
 export const ProjectList = () => {
   const projects = useStore(state => state.projects);
   const selectProject = useStore(state => state.selectProject);
-  const addProject = useStore(state => state.addProject);
   const isDesktopMode = useStore(state => state.isDesktopMode);
   const toggleDesktopMode = useStore(state => state.toggleDesktopMode);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'name'>('recent');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [isNewProjectMenuOpen, setIsNewProjectMenuOpen] = useState(false);
+  const [isFolderImportModalOpen, setIsFolderImportModalOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const newProjectMenuRef = useRef<HTMLDivElement>(null);
 
   const TAGS = ['应用', 'UI组件', '包', '代码片段'];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (newProjectMenuRef.current && !newProjectMenuRef.current.contains(event.target as Node)) {
+        setIsNewProjectMenuOpen(false);
+      }
+    };
+
+    if (isNewProjectMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isNewProjectMenuOpen]);
 
   const filteredProjects = useMemo(() => {
     let result = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -53,14 +73,6 @@ export const ProjectList = () => {
     }
     return result;
   }, [projects, search, sortBy, activeTag]);
-
-  const handleAddProject = () => {
-    addProject({
-      name: 'New Project',
-      cover: `https://picsum.photos/seed/${Date.now()}/600/800`,
-      files: []
-    });
-  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -111,13 +123,52 @@ export const ProjectList = () => {
             {isDesktopMode ? <MonitorOff size={16} /> : <Monitor size={16} />}
             {isDesktopMode ? 'Web Mode' : 'Desktop Mode'}
           </button>
-          <button
-            onClick={handleAddProject}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 backdrop-blur-md hover:bg-indigo-500/80 border border-indigo-500/50 rounded-lg text-sm font-medium text-white transition-all shadow-lg shadow-indigo-500/20"
-          >
-            <Plus size={16} />
-            New Project
-          </button>
+          
+          <div className="relative" ref={newProjectMenuRef}>
+            <button
+              onClick={() => setIsNewProjectMenuOpen(!isNewProjectMenuOpen)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 backdrop-blur-md hover:bg-indigo-500/80 border border-indigo-500/50 rounded-lg text-sm font-medium text-white transition-all shadow-lg shadow-indigo-500/20"
+            >
+              <Plus size={16} />
+              New Project
+              <ChevronDown size={14} className={`transition-transform ${isNewProjectMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            <AnimatePresence>
+              {isNewProjectMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden z-50"
+                >
+                  <div className="p-1 flex flex-col">
+                    <button
+                      onClick={() => {
+                        setIsNewProjectMenuOpen(false);
+                        setIsFolderImportModalOpen(true);
+                      }}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-700 hover:text-white rounded-lg transition-colors text-left"
+                    >
+                      <Folder size={16} className="text-indigo-400" />
+                      从文件夹添加
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsNewProjectMenuOpen(false);
+                        setIsTemplateModalOpen(true);
+                      }}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-700 hover:text-white rounded-lg transition-colors text-left"
+                    >
+                      <LayoutTemplate size={16} className="text-indigo-400" />
+                      从模板中添加
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -164,6 +215,12 @@ export const ProjectList = () => {
       <AnimatePresence>
         {settingsProject && (
           <SettingsModal project={settingsProject} onClose={() => setSettingsProject(null)} />
+        )}
+        {isFolderImportModalOpen && (
+          <FolderImportModal onClose={() => setIsFolderImportModalOpen(false)} />
+        )}
+        {isTemplateModalOpen && (
+          <TemplateSelectModal onClose={() => setIsTemplateModalOpen(false)} />
         )}
       </AnimatePresence>
     </div>
